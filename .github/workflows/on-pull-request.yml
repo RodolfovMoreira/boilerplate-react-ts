@@ -1,0 +1,117 @@
+
+name: Develop Boilerplates CI - On pull request
+
+on:
+  push:
+
+jobs:
+  setup: 
+    name: Testing Application and creating build artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2-beta
+        with:
+          node-version: '16'
+          check-latest: true
+      
+      - name: Getting Yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+
+      - uses: actions/cache@v2
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Installing Dependencies
+        run: yarn install --prefer-offline
+      
+      - name: Running Lint
+        run: yarn lint
+
+      - name: Running Tests
+        run: yarn test:ci
+
+      - name: Building Application
+        run: yarn build
+        env:
+        # REACT_APP_API_URL: ${{ secrets.API_URL }}
+          REACT_APP_USE_MOCKS: true
+        
+      - name: Saving Build as Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: boilerplate-artifact
+          path: build #caminho da pasta onde está o build do projeto
+      
+      - name: Fixing React-Router
+        run: cp build/index.html build/200.html
+          
+  deploy:
+    name: Deploy Application
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: boilerplate-artifact
+          path: build
+
+      #   Deploy AWS
+
+      # - name: Deploy S3
+      #   uses: jakejarvis/s3-sync-action@master
+      #   with:
+      #     args: --acl public-read --follow-symlinks --delete
+      #   env:
+      #     AWS_S3_BUCKET: ${{ secrets.DEVELOP_S3_BUCKET }}
+      #     AWS_ACCESS_KEY_ID: ${{ secrets.DEVELOP_AWS_ACCESS_KEY_ID }}
+      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.DEVELOP_AWS_SECRET_ACCESS_KEY }}
+      #     AWS_REGION: ${{ secrets.DEVELOP_S3_BUCKET_REGION }}
+      #     SOURCE_DIR: 'build'
+
+
+      # Deploy GCP
+
+      # - name: Set up Cloud SDK
+      #   uses: google-github-actions/setup-gcloud@v0
+      #   with:
+      #     service_account_key: ${{ secrets.GCS_SA_KEY }}
+      #     project_id: ${{ secrets.GCS_PROJECT }}
+      #     export_default_credentials: true
+      #   env:
+      #     GCS_BUCKET: ${{ secrets.GCS_BUCKET }}
+      
+      # - name: Deploy to Cloud Storage
+      #   run: |-
+      #     gsutil -m rsync -R output gs://$GCS_BUCKET
+
+
+      # Deploy Azure
+
+      # - name: 'Deploy to Azure WebApp'
+      #   uses: azure/webapps-deploy@v2
+      #   with: 
+      #     app-name: boilerplate-app-name
+      #     publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+      #     package: 'boilerplate-app-path'      # set this to the path to your web app project, defaults to the repository root
+
+
+      # Deploy Firebase
+
+      # - name: Deploy to Firebase
+      #   if: github.ref == 'refs/heads/develop' #definir a brach 
+      #   uses: w9jds/firebase-action@master
+      #   with:
+      #     args: deploy --only hosting:staging
+      #   env:
+      #     FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
