@@ -1,7 +1,9 @@
 import React from 'react';
 
+import { Exemple } from './components/Exemple';
+
 function App() {
-  return <h1>Boilerplate</h1>;
+  return <Exemple />;
 }
 
 export default App;
